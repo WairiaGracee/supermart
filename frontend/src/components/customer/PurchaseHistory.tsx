@@ -53,7 +53,11 @@ export function PurchaseHistory() {
                 <td className="border px-4 py-2">
                   {new Date(purchase.saleDate).toLocaleDateString()}
                 </td>
-                <td className="border px-4 py-2">{purchase.product as string}</td>
+                <td className="border px-4 py-2">
+                  {typeof purchase.product === 'object' && purchase.product !== null
+                    ? (purchase.product as { name: string }).name
+                    : purchase.product}
+                </td>
                 <td className="border px-4 py-2">{purchase.quantity}</td>
                 <td className="border px-4 py-2 font-bold">KES {purchase.totalAmount}</td>
                 <td className="border px-4 py-2">

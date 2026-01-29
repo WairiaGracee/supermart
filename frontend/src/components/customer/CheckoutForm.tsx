@@ -31,8 +31,14 @@ export function CheckoutForm({ onSuccess }: CheckoutFormProps) {
       }
       alert('Payment initiated! Check your phone for M-Pesa prompt.');
       onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Payment failed');
+    } catch (err: unknown) {
+      // Check if it's an authentication error
+      const error = err as { response?: { status?: number } };
+      if (error.response?.status === 401) {
+        setError('Your session has expired. Please log in again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Payment failed');
+      }
     } finally {
       setLoading(false);
     }

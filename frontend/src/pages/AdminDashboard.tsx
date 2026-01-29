@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { adminService } from '../services/adminService';
+import { branchService } from '../services/branchService';
 import { reportService } from '../services/reportService';
 import type { Branch, SalesReport } from '../types';
 import { InventoryView } from '../components/admin/InventoryView';
@@ -22,7 +22,7 @@ export function AdminDashboard() {
   useEffect(() => {
     const loadBranches = async () => {
       try {
-        const data = await adminService.getBranches();
+        const data = await branchService.getBranches();
         setBranches(data);
         if (data.length > 0) {
           setSelectedBranch(data[0]._id);
@@ -39,7 +39,7 @@ export function AdminDashboard() {
       const loadInventory = async () => {
         try {
           setLoading(true);
-          const data = await adminService.getBranchInventory(selectedBranch);
+          const data = await branchService.getBranchInventory(selectedBranch);
           const inventoryData = Array.isArray(data?.inventory) ? data.inventory : [];
           setInventory(inventoryData as Record<string, unknown>[]);
         } catch (error) {
@@ -73,7 +73,7 @@ export function AdminDashboard() {
   const handleRestockSuccess = async () => {
     if (selectedBranch) {
       try {
-        const data = await adminService.getBranchInventory(selectedBranch);
+        const data = await branchService.getBranchInventory(selectedBranch);
         const inventoryData = Array.isArray(data?.inventory) ? data.inventory : [];
         setInventory(inventoryData as Record<string, unknown>[]);
       } catch (error) {

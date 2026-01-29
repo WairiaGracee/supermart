@@ -5,14 +5,22 @@ import type { Branch } from '../types';
 
 interface BranchResponse {
   success: boolean;
-  count: number;
-  branches: Branch[];
+  message: string;
+  data?: Record<string, unknown>;
+  branches?: Branch[];
+  inventory?: Array<Record<string, unknown>>;
 }
 
 export const branchService = {
-  // Public endpoint - no auth required
   getBranches: async (): Promise<Branch[]> => {
     const response = await api.get<BranchResponse>('/branches');
-    return response.data.branches || [];
+    const branches = response.data.data?.branches || response.data.branches;
+    return Array.isArray(branches) ? branches : [];
+  },
+
+  getBranchInventory: async (branchId: string): Promise<Record<string, unknown>> => {
+    const response = await api.get<BranchResponse>(`/branches/${branchId}/inventory`);
+    const data = response.data.data || response.data;
+    return typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
   },
 };

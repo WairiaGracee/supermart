@@ -26,12 +26,12 @@ export const initiatePayment = async (req, res) => {
   try {
     console.log('\n🔵 INITIATING PAYMENT');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('User from request:', req.user ? `${req.user.name} (${req.user._id})` : 'NO USER');
+    console.log('User from request:', req.user ? `${req.user.name} (${req.user.id})` : 'NO USER');
 
     const { branchId, productId, quantity, phoneNumber } = req.body;
 
     // Check authentication
-    if (!req.user || !req.user._id) {
+    if (!req.user || !req.user.id) {
       console.log('❌ FAIL: No user authenticated');
       return res.status(401).json({
         success: false,
@@ -39,7 +39,7 @@ export const initiatePayment = async (req, res) => {
       });
     }
 
-    const userId = req.user._id;
+    const userId = req.user.id;
 
     // Validate inputs
     if (!branchId || !productId || !quantity || !phoneNumber) {
@@ -97,13 +97,13 @@ export const initiatePayment = async (req, res) => {
     console.log('Saving to database...');
     const savedSale = await sale.save();
 
-    console.log('✅ SUCCESS: Sale created:', savedSale._id);
+    console.log('✅ SUCCESS: Sale created:', savedSale.id);
 
     res.json({
       success: true,
       data: {
-        saleId: savedSale._id,
-        checkoutRequestID: `sandbox-${savedSale._id}`,
+        saleId: savedSale.id,
+        checkoutRequestID: `sandbox-${savedSale.id}`,
         totalAmount: totalAmount
       }
     });
@@ -169,7 +169,7 @@ export const confirmPayment = async (req, res) => {
 // Get purchases
 export const getMyPurchases = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user.id;
     const sales = await Sale.find({ customer: userId })
       .populate('product')
       .populate('branch')

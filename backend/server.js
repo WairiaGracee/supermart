@@ -32,6 +32,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.get('/health', (req, res) => {

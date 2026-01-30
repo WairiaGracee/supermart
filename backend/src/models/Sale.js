@@ -1,70 +1,91 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../config/db.js';
 
-const saleSchema = new mongoose.Schema(
-  {
-    customer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Please provide a customer'],
-    },
-    branch: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Branch',
-      required: [true, 'Please provide a branch'],
-    },
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: [true, 'Please provide a product'],
-    },
-    quantity: {
-      type: Number,
-      required: [true, 'Please provide quantity'],
-      min: 1,
-    },
-    unitPrice: {
-      type: Number,
-      required: [true, 'Please provide unit price'],
-      min: 0,
-    },
-    totalAmount: {
-      type: Number,
-      required: [true, 'Please provide total amount'],
-      min: 0,
-    },
-    paymentStatus: {
-      type: String,
-      enum: ['pending', 'completed', 'failed'],
-      default: 'pending',
-    },
-    mpesaTransactionId: {
-      type: String,
-      sparse: true,
-    },
-    mpesaReceiptNumber: {
-      type: String,
-      sparse: true,
-    },
-    paymentMethod: {
-      type: String,
-      enum: ['mpesa', 'cash'],
-      default: 'mpesa',
-    },
-    saleDate: {
-      type: Date,
-      default: Date.now,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+const Sale = sequelize.define('Sale', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  customerId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'users',
+      key: 'id',
     },
   },
-  { timestamps: true }
-);
+  branchId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'branches',
+      key: 'id',
+    },
+  },
+  productId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'products',
+      key: 'id',
+    },
+  },
+  quantity: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      min: 1,
+    },
+  },
+  unitPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: 0,
+    },
+  },
+  totalAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: 0,
+    },
+  },
+  paymentStatus: {
+    type: DataTypes.STRING,
+    defaultValue: 'pending',
+    validate: {
+      isIn: [['pending', 'completed', 'failed']],
+    },
+  },
+  mpesaTransactionId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  mpesaReceiptNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  paymentMethod: {
+    type: DataTypes.STRING,
+    defaultValue: 'mpesa',
+    validate: {
+      isIn: [['mpesa', 'cash']],
+    },
+  },
+  saleDate: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+}, {
+  timestamps: true,
+  tableName: 'sales',
+  indexes: [
+    { fields: ['customerId', 'createdAt'] },
+    { fields: ['branchId', 'createdAt'] },
+    { fields: ['productId', 'createdAt'] },
+  ],
+});
 
-// Index for faster queries
-saleSchema.index({ customer: 1, createdAt: -1 });
-saleSchema.index({ branch: 1, createdAt: -1 });
-saleSchema.index({ product: 1, createdAt: -1 });
-
-export default mongoose.model('Sale', saleSchema);
+export default Sale;

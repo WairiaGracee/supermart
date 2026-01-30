@@ -1,13 +1,11 @@
-import Stock from '../models/Stock.js';
-import Branch from '../models/Branch.js';
-import Product from '../models/Product.js';
+import { Stock, Branch, Product } from '../models/index.js';
 
 // @desc    Get all branches
 // @route   GET /api/admin/branches
 // @access  Private/Admin
 export const getAllBranches = async (req, res, next) => {
   try {
-    const branches = await Branch.find();
+    const branches = await Branch.findAll();
 
     res.status(200).json({
       success: true,
@@ -26,7 +24,7 @@ export const getBranchInventory = async (req, res, next) => {
   try {
     const { branchId } = req.params;
 
-    const branch = await Branch.findById(branchId);
+    const branch = await Branch.findByPk(branchId);
     if (!branch) {
       return res.status(404).json({
         success: false,
@@ -34,17 +32,21 @@ export const getBranchInventory = async (req, res, next) => {
       });
     }
 
-    const inventory = await Stock.find({ branch: branchId })
-      .populate('product')
-      .populate('branch');
+    const inventory = await Stock.findAll({
+      where: { branchId },
+      include: [
+        { model: Product, as: 'product' },
+        { model: Branch, as: 'branch' },
+      ],
+    });
 
     res.status(200).json({
       success: true,
       branch: branch.name,
       inventory: inventory.map((item) => ({
-        stockId: item._id,
+        stockId: item.id,
         productName: item.product.name,
-        productId: item.product._id,
+        productId: item.product.id,
         quantity: item.quantity,
         price: item.product.price,
         lastRestocked: item.lastRestocked,
@@ -60,30 +62,33 @@ export const getBranchInventory = async (req, res, next) => {
 // @access  Private/Admin
 export const getAllInventory = async (req, res, next) => {
   try {
-    const inventory = await Stock.find()
-      .populate('product')
-      .populate('branch');
+    const inventory = await Stock.findAll({
+      include: [
+        { model: Product, as: 'product' },
+        { model: Branch, as: 'branch' },
+      ],
+    });
 
     // Group by branch
     const grouped = {};
     inventory.forEach((item) => {
-      if (!grouped[item.branch._id]) {
-        grouped[item.branch._id] = {
-          branchId: item.branch._id,
+      if (!grouped[item.branch.id]) {
+        grouped[item.branch.id] = {
+          branchId: item.branch.id,
           branchName: item.branch.name,
           items: [],
           totalItems: 0,
         };
       }
-      grouped[item.branch._id].items.push({
-        stockId: item._id,
+      grouped[item.branch.id].items.push({
+        stockId: item.id,
         productName: item.product.name,
-        productId: item.product._id,
+        productId: item.product.id,
         quantity: item.quantity,
         price: item.product.price,
         lastRestocked: item.lastRestocked,
       });
-      grouped[item.branch._id].totalItems += item.quantity;
+      grouped[item.branch.id].totalItems += item.quantity;
     });
 
     res.status(200).json({
@@ -109,7 +114,7 @@ export const initializeStock = async (req, res, next) => {
       });
     }
 
-    const branch = await Branch.findById(branchId);
+    const branch = await Branch.findByPk(branchId);
     if (!branch) {
       return res.status(404).json({
         success: false,
@@ -122,25 +127,27 @@ export const initializeStock = async (req, res, next) => {
     for (const { productId, quantity } of stocks) {
       // Check if stock already exists
       let stock = await Stock.findOne({
-        branch: branchId,
-        product: productId,
+        where: {
+          branchId,
+          productId,
+        },
       });
 
       if (stock) {
         // Update existing stock
         stock.quantity = quantity;
         stock.lastRestocked = new Date();
+        await stock.save();
       } else {
         // Create new stock
         stock = await Stock.create({
-          branch: branchId,
-          product: productId,
+          branchId,
+          productId,
           quantity,
           lastRestocked: new Date(),
         });
       }
 
-      await stock.save();
       createdStocks.push(stock);
     }
 
@@ -168,7 +175,7 @@ export const restock = async (req, res, next) => {
       });
     }
 
-    const branch = await Branch.findById(branchId);
+    const branch = await Branch.findByPk(branchId);
     if (!branch) {
       return res.status(404).json({
         success: false,
@@ -176,7 +183,7 @@ export const restock = async (req, res, next) => {
       });
     }
 
-    const product = await Product.findById(productId);
+    const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -186,14 +193,16 @@ export const restock = async (req, res, next) => {
 
     // Find or create stock record
     let stock = await Stock.findOne({
-      branch: branchId,
-      product: productId,
+      where: {
+        branchId,
+        productId,
+      },
     });
 
     if (!stock) {
       stock = await Stock.create({
-        branch: branchId,
-        product: productId,
+        branchId,
+        productId,
         quantity,
         lastRestocked: new Date(),
       });
@@ -233,13 +242,12 @@ export const updateStock = async (req, res, next) => {
       });
     }
 
-    const stock = await Stock.findByIdAndUpdate(
-      stockId,
-      { quantity, lastRestocked: new Date() },
-      { new: true, runValidators: true }
-    )
-      .populate('product')
-      .populate('branch');
+    const stock = await Stock.findByPk(stockId, {
+      include: [
+        { model: Product, as: 'product' },
+        { model: Branch, as: 'branch' },
+      ],
+    });
 
     if (!stock) {
       return res.status(404).json({
@@ -247,6 +255,10 @@ export const updateStock = async (req, res, next) => {
         message: 'Stock not found',
       });
     }
+
+    stock.quantity = quantity;
+    stock.lastRestocked = new Date();
+    await stock.save();
 
     res.status(200).json({
       success: true,

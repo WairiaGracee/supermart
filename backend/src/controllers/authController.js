@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import { User } from '../models/index.js';
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -23,35 +23,35 @@ export const register = async (req, res, next) => {
       });
     }
 
-    let user = await User.findOne({ email });
-    if (user) {
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
       return res.status(400).json({
         success: false,
         message: 'User already exists with that email',
       });
     }
 
-    user = await User.create({
+    const user = await User.create({
       name,
       email,
       password,
       phone,
       role: role || 'customer',
-      branch: role === 'customer' ? branch : null,
+      branchId: role === 'customer' ? branch : null,
     });
 
-    const token = generateToken(user._id, user.role);
+    const token = generateToken(user.id, user.role);
 
     res.status(201).json({
       success: true,
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
-        branch: user.branch,
+        branch: user.branchId,
       },
     });
   } catch (error) {
@@ -73,7 +73,7 @@ export const login = async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ where: { email } });
 
     if (!user) {
       return res.status(400).json({
@@ -91,18 +91,18 @@ export const login = async (req, res, next) => {
       });
     }
 
-    const token = generateToken(user._id, user.role);
+    const token = generateToken(user.id, user.role);
 
     res.status(200).json({
       success: true,
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
-        branch: user.branch,
+        branch: user.branchId,
       },
     });
   } catch (error) {
@@ -115,7 +115,9 @@ export const login = async (req, res, next) => {
 // @access  Private
 export const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password'] },
+    });
 
     res.status(200).json({
       success: true,

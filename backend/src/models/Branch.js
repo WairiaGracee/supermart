@@ -1,28 +1,31 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../config/db.js';
 
-const branchSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, 'Please provide branch name'],
-      unique: true,
-      trim: true,
-      enum: ['Nairobi HQ', 'Kisumu', 'Mombasa', 'Nakuru', 'Eldoret'],
-    },
-    location: {
-      type: String,
-      required: [true, 'Please provide branch location'],
-    },
-    isHeadquarter: {
-      type: Boolean,
-      default: false,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+const Branch = sequelize.define('Branch', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+    validate: {
+      isIn: [['Nairobi HQ', 'Kisumu', 'Mombasa', 'Nakuru', 'Eldoret']],
     },
   },
-  { timestamps: true }
-);
+  location: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  isHeadquarter: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+}, {
+  timestamps: true,
+  tableName: 'branches',
+});
 
-export default mongoose.model('Branch', branchSchema);
+export default Branch;

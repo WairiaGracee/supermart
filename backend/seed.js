@@ -1,22 +1,19 @@
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Import models with correct paths
-import User from './src/models/User.js';
-import Product from './src/models/Product.js';
-import Branch from './src/models/Branch.js';
+import { Branch, Product, syncDatabase, sequelize } from './src/models/index.js';
 
 const seedDatabase = async () => {
   try {
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/supermarket_db';
-    await mongoose.connect(uri);
-    console.log('✅ Connected to MongoDB');
+    // Sync database (creates tables if they don't exist)
+    await syncDatabase({ force: true });
+    console.log('Database synchronized');
 
-    await Branch.deleteMany({});
-    await Product.deleteMany({});
-    console.log('🗑️  Cleared existing data');
+    // Clear existing data
+    await Branch.destroy({ where: {} });
+    await Product.destroy({ where: {} });
+    console.log('Cleared existing data');
 
     const branches = [
       { name: 'Nairobi HQ', location: 'Nairobi CBD', isHeadquarter: true },
@@ -26,8 +23,8 @@ const seedDatabase = async () => {
       { name: 'Eldoret', location: 'Eldoret Town', isHeadquarter: false },
     ];
 
-    const createdBranches = await Branch.insertMany(branches);
-    console.log(`✅ Created ${createdBranches.length} branches`);
+    const createdBranches = await Branch.bulkCreate(branches);
+    console.log(`Created ${createdBranches.length} branches`);
 
     const products = [
       { name: 'Coke', price: 150, description: 'Classic Coca Cola' },
@@ -35,18 +32,19 @@ const seedDatabase = async () => {
       { name: 'Sprite', price: 150, description: 'Sprite Lemonade' },
     ];
 
-    const createdProducts = await Product.insertMany(products);
-    console.log(`✅ Created ${createdProducts.length} products`);
+    const createdProducts = await Product.bulkCreate(products);
+    console.log(`Created ${createdProducts.length} products`);
 
-    console.log('\n📊 Database seeded successfully!');
+    console.log('\nDatabase seeded successfully!');
     console.log('\nBranches:');
     createdBranches.forEach((b) => console.log(`  - ${b.name} (${b.location})`));
     console.log('\nProducts:');
     createdProducts.forEach((p) => console.log(`  - ${p.name} (KES ${p.price})`));
 
+    await sequelize.close();
     process.exit(0);
   } catch (error) {
-    console.error('❌ Seeding failed:', error.message);
+    console.error('Seeding failed:', error.message);
     process.exit(1);
   }
 };

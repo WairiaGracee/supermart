@@ -1,7 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+
+dotenv.config();
+
+// Import database and models
+import { syncDatabase } from './src/models/index.js';
 
 // Import routes with correct paths
 import authRoutes from './src/routes/authRoutes.js';
@@ -9,22 +13,19 @@ import saleRoutes from './src/routes/saleRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import reportRoutes from './src/routes/reportRoutes.js';
 
-dotenv.config();
-
 const app = express();
 
-const connectDB = async () => {
+const initializeDatabase = async () => {
   try {
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/supermarket_db';
-    await mongoose.connect(uri);
-    console.log('✅ MongoDB connected successfully');
+    await syncDatabase();
+    console.log('SQLite connected successfully');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error.message);
+    console.error('SQLite connection error:', error.message);
     process.exit(1);
   }
 };
 
-connectDB();
+initializeDatabase();
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -34,7 +35,7 @@ app.use(cors({
 }));
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'Server is running ✅' });
+  res.json({ status: 'Server is running' });
 });
 
 // Mount routes
@@ -60,8 +61,8 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 export default app;

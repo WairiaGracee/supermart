@@ -1,4 +1,5 @@
 import * as reportService from '../services/reportService.js';
+import { Product } from '../models/index.js';
 
 // @desc    Get comprehensive sales report
 // @route   GET /api/reports/sales-summary
@@ -81,8 +82,7 @@ export const getSalesByBranch = async (req, res, next) => {
 // @access  Private/Admin
 export const getProducts = async (req, res, next) => {
   try {
-    const Product = (await import('../models/Product.js')).default;
-    const products = await Product.find();
+    const products = await Product.findAll();
 
     res.status(200).json({
       success: true,

@@ -1,28 +1,33 @@
-import Sale from '../models/Sale.js';
-import Product from '../models/Product.js';
-import Branch from '../models/Branch.js';
+import { Op } from 'sequelize';
+import { Sale, Product, Branch } from '../models/index.js';
 
 export const generateSalesReport = async (startDate, endDate) => {
   try {
-    // Get all completed sales in the date range
-    const query = {
+    // Build where clause for completed sales in the date range
+    const whereClause = {
       paymentStatus: 'completed',
     };
 
     if (startDate || endDate) {
-      query.saleDate = {};
-      if (startDate) query.saleDate.$gte = new Date(startDate);
+      whereClause.saleDate = {};
+      if (startDate) {
+        whereClause.saleDate[Op.gte] = new Date(startDate);
+      }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        query.saleDate.$lte = end;
+        whereClause.saleDate[Op.lte] = end;
       }
     }
 
-    const sales = await Sale.find(query)
-      .populate('product')
-      .populate('branch')
-      .lean();
+    const sales = await Sale.findAll({
+      where: whereClause,
+      include: [
+        { model: Product, as: 'product' },
+        { model: Branch, as: 'branch' },
+      ],
+      raw: false,
+    });
 
     if (!sales || sales.length === 0) {
       return {
@@ -35,7 +40,7 @@ export const generateSalesReport = async (startDate, endDate) => {
 
     // Calculate total sales and income
     const totalSales = sales.length;
-    const totalIncome = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+    const totalIncome = sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
 
     // Group by product
     const productMap = {};
@@ -49,7 +54,7 @@ export const generateSalesReport = async (startDate, endDate) => {
         };
       }
       productMap[productName].quantity += sale.quantity;
-      productMap[productName].income += sale.totalAmount;
+      productMap[productName].income += parseFloat(sale.totalAmount);
     });
 
     const salesByProduct = Object.values(productMap);
@@ -66,7 +71,7 @@ export const generateSalesReport = async (startDate, endDate) => {
         };
       }
       branchMap[branchName].quantity += sale.quantity;
-      branchMap[branchName].income += sale.totalAmount;
+      branchMap[branchName].income += parseFloat(sale.totalAmount);
     });
 
     const salesByBranch = Object.values(branchMap);
@@ -86,25 +91,31 @@ export const generateSalesReport = async (startDate, endDate) => {
 
 export const getSalesbyProduct = async (productId, startDate, endDate) => {
   try {
-    const query = {
-      product: productId,
+    const whereClause = {
+      productId,
       paymentStatus: 'completed',
     };
 
     if (startDate || endDate) {
-      query.saleDate = {};
-      if (startDate) query.saleDate.$gte = new Date(startDate);
+      whereClause.saleDate = {};
+      if (startDate) {
+        whereClause.saleDate[Op.gte] = new Date(startDate);
+      }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        query.saleDate.$lte = end;
+        whereClause.saleDate[Op.lte] = end;
       }
     }
 
-    const sales = await Sale.find(query).populate('branch').lean();
+    const sales = await Sale.findAll({
+      where: whereClause,
+      include: [{ model: Branch, as: 'branch' }],
+      raw: false,
+    });
 
     const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
-    const totalIncome = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+    const totalIncome = sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
 
     return {
       totalQuantity,
@@ -120,25 +131,31 @@ export const getSalesbyProduct = async (productId, startDate, endDate) => {
 
 export const getSalesByBranch = async (branchId, startDate, endDate) => {
   try {
-    const query = {
-      branch: branchId,
+    const whereClause = {
+      branchId,
       paymentStatus: 'completed',
     };
 
     if (startDate || endDate) {
-      query.saleDate = {};
-      if (startDate) query.saleDate.$gte = new Date(startDate);
+      whereClause.saleDate = {};
+      if (startDate) {
+        whereClause.saleDate[Op.gte] = new Date(startDate);
+      }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        query.saleDate.$lte = end;
+        whereClause.saleDate[Op.lte] = end;
       }
     }
 
-    const sales = await Sale.find(query).populate('product').lean();
+    const sales = await Sale.findAll({
+      where: whereClause,
+      include: [{ model: Product, as: 'product' }],
+      raw: false,
+    });
 
     const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
-    const totalIncome = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+    const totalIncome = sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
 
     return {
       totalQuantity,

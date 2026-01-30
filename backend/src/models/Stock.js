@@ -1,36 +1,49 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../config/db.js';
 
-const stockSchema = new mongoose.Schema(
-  {
-    branch: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Branch',
-      required: [true, 'Please provide a branch'],
-    },
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: [true, 'Please provide a product'],
-    },
-    quantity: {
-      type: Number,
-      required: [true, 'Please provide quantity'],
-      min: 0,
-      default: 0,
-    },
-    lastRestocked: {
-      type: Date,
-      default: Date.now,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+const Stock = sequelize.define('Stock', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  branchId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'branches',
+      key: 'id',
     },
   },
-  { timestamps: true }
-);
+  productId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'products',
+      key: 'id',
+    },
+  },
+  quantity: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: {
+      min: 0,
+    },
+  },
+  lastRestocked: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+  },
+}, {
+  timestamps: true,
+  tableName: 'stocks',
+  indexes: [
+    {
+      unique: true,
+      fields: ['branchId', 'productId'],
+    },
+  ],
+});
 
-// Compound index to ensure unique branch-product combination
-stockSchema.index({ branch: 1, product: 1 }, { unique: true });
-
-export default mongoose.model('Stock', stockSchema);
+export default Stock;

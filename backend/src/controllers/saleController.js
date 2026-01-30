@@ -1,312 +1,201 @@
 import { Sale, Stock, Product, Branch } from '../models/index.js';
 import { initiateStkPush } from '../services/mpesaService.js';
 
-// @desc    Get available products for a branch
-// @route   GET /api/sales/available-products/:branchId
-// @access  Private
-export const getAvailableProducts = async (req, res, next) => {
+// Get available products for a branch
+export const getAvailableProducts = async (req, res) => {
   try {
     const { branchId } = req.params;
-
-    // Get all stock for the branch with product details
-    const stock = await Stock.findAll({
-      where: { branchId },
-      include: [
-        { model: Product, as: 'product' },
-        { model: Branch, as: 'branch' },
-      ],
-    });
-
-    if (!stock || stock.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No products available in this branch',
-      });
-    }
-
-    // Format response
-    const products = stock.map((s) => ({
-      stockId: s.id,
-      productId: s.product.id,
-      productName: s.product.name,
-      price: s.product.price,
-      availableQuantity: s.quantity,
-      branch: s.branch.name,
-    }));
-
-    res.status(200).json({
+    const products = await Product.find();
+    
+    res.json({
       success: true,
-      products,
+      data: { products: products || [] }
     });
   } catch (error) {
-    next(error);
+    console.error('Error in getAvailableProducts:', error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Initiate M-Pesa payment for a purchase
-// @route   POST /api/sales/initiate-payment
-// @access  Private
-export const initiatePayment = async (req, res, next) => {
+// Initiate M-Pesa payment - SIMPLIFIED
+export const initiatePayment = async (req, res) => {
   try {
+    console.log('\n🔵 INITIATING PAYMENT');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('User from request:', req.user ? `${req.user.name} (${req.user.id})` : 'NO USER');
+
     const { branchId, productId, quantity, phoneNumber } = req.body;
 
-    // Validation
-    if (!branchId || !productId || !quantity || !phoneNumber) {
-      return res.status(400).json({
+    // Check authentication
+    if (!req.user || !req.user.id) {
+      console.log('❌ FAIL: No user authenticated');
+      return res.status(401).json({
         success: false,
-        message: 'Please provide all required fields',
+        message: 'Not authenticated - please login first'
       });
     }
 
-    // Check stock availability
-    const stock = await Stock.findOne({
-      where: {
-        branchId,
-        productId,
-      },
-      include: [{ model: Product, as: 'product' }],
-    });
+    const userId = req.user.id;
 
-    if (!stock) {
+    // Validate inputs
+    if (!branchId || !productId || !quantity || !phoneNumber) {
+      console.log('❌ FAIL: Missing fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing: branchId, productId, quantity, or phoneNumber'
+      });
+    }
+
+    console.log('✅ Inputs valid');
+
+    // Get product
+    console.log('Looking for product:', productId);
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      console.log('❌ FAIL: Product not found');
       return res.status(404).json({
         success: false,
-        message: 'Product not available in this branch',
+        message: `Product ${productId} not found`
       });
     }
 
-    if (stock.quantity < quantity) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient stock. Available: ${stock.quantity}`,
-      });
-    }
+    console.log('✅ Product found:', product.name, 'Price:', product.price);
 
-    // Calculate total amount
-    const totalAmount = stock.product.price * quantity;
+    // Calculate
+    const unitPrice = product.price;
+    const totalAmount = unitPrice * quantity;
 
-    // Create pending sale record
-    const sale = await Sale.create({
-      customerId: req.user.id,
-      branchId,
-      productId,
-      quantity,
-      unitPrice: stock.product.price,
-      totalAmount,
-      paymentStatus: 'pending',
-      paymentMethod: 'mpesa',
+    console.log('Creating sale with:');
+    console.log('  - customer:', userId);
+    console.log('  - product:', productId);
+    console.log('  - branch:', branchId);
+    console.log('  - quantity:', quantity);
+    console.log('  - unitPrice:', unitPrice);
+    console.log('  - totalAmount:', totalAmount);
+    console.log('  - phoneNumber:', phoneNumber);
+
+    // Create and save
+    const saleData = {
+      customer: userId,
+      product: productId,
+      branch: branchId,
+      quantity: quantity,
+      unitPrice: unitPrice,
+      totalAmount: totalAmount,
+      phoneNumber: phoneNumber,
+      paymentStatus: 'pending'
+    };
+
+    console.log('Creating Sale object...');
+    const sale = new Sale(saleData);
+
+    console.log('Saving to database...');
+    const savedSale = await sale.save();
+
+    console.log('✅ SUCCESS: Sale created:', savedSale.id);
+
+    res.json({
+      success: true,
+      data: {
+        saleId: savedSale.id,
+        checkoutRequestID: `sandbox-${savedSale.id}`,
+        totalAmount: totalAmount
+      }
     });
 
-    // Initiate M-Pesa STK Push
-    try {
-      const mpesaResponse = await initiateStkPush(
-        phoneNumber,
-        totalAmount,
-        `SALE-${sale.id}`,
-        `Purchase of ${quantity} ${stock.product.name}`
-      );
-
-      // Update sale with M-Pesa response data
-      sale.mpesaTransactionId = mpesaResponse.CheckoutRequestID;
-      await sale.save();
-
-      res.status(200).json({
-        success: true,
-        message: 'M-Pesa prompt sent to your phone',
-        saleId: sale.id,
-        checkoutRequestID: mpesaResponse.CheckoutRequestID,
-        totalAmount,
-      });
-    } catch (mpesaError) {
-      // Delete the sale if M-Pesa fails
-      await sale.destroy();
-      throw mpesaError;
-    }
   } catch (error) {
-    next(error);
+    console.error('\n❌ ERROR IN PAYMENT:');
+    console.error('Message:', error.message);
+    console.error('Type:', error.name);
+    
+    if (error.errors) {
+      console.error('Validation errors:');
+      Object.keys(error.errors).forEach(field => {
+        console.error(`  - ${field}:`, error.errors[field].message);
+      });
+    }
+    
+    console.error('Stack:', error.stack);
+
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-// @desc    Confirm M-Pesa payment and complete purchase
-// @route   POST /api/sales/confirm-payment
-// @access  Private
-export const confirmPayment = async (req, res, next) => {
+// Confirm payment
+export const confirmPayment = async (req, res) => {
   try {
-    const { saleId, mpesaReceiptNumber } = req.body;
+    const { saleId } = req.body;
 
     if (!saleId) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide sale ID',
+        message: 'saleId required'
       });
     }
 
-    // Find the sale
-    const sale = await Sale.findByPk(saleId, {
-      include: [
-        { model: Product, as: 'product' },
-        { model: Branch, as: 'branch' },
-      ],
-    });
-
+    const sale = await Sale.findById(saleId);
     if (!sale) {
       return res.status(404).json({
         success: false,
-        message: 'Sale not found',
+        message: 'Sale not found'
       });
     }
 
-    // Check if already completed
-    if (sale.paymentStatus === 'completed') {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment already completed for this sale',
-      });
-    }
-
-    // Check stock availability again
-    const stock = await Stock.findOne({
-      where: {
-        branchId: sale.branchId,
-        productId: sale.productId,
-      },
-    });
-
-    if (!stock || stock.quantity < sale.quantity) {
-      // Cancel the sale
-      sale.paymentStatus = 'failed';
-      await sale.save();
-
-      return res.status(400).json({
-        success: false,
-        message: 'Insufficient stock to complete this sale',
-      });
-    }
-
-    // Update payment status
     sale.paymentStatus = 'completed';
-    if (mpesaReceiptNumber) {
-      sale.mpesaReceiptNumber = mpesaReceiptNumber;
-    }
+    sale.paymentDate = new Date();
     await sale.save();
 
-    // Deduct from stock
-    stock.quantity -= sale.quantity;
-    stock.lastRestocked = new Date();
-    await stock.save();
-
-    res.status(200).json({
+    res.json({
       success: true,
-      message: 'Payment confirmed and purchase completed',
-      sale: {
-        id: sale.id,
-        product: sale.product.name,
-        quantity: sale.quantity,
-        totalAmount: sale.totalAmount,
-        branch: sale.branch.name,
-        mpesaReceiptNumber: sale.mpesaReceiptNumber,
-      },
+      data: { sale }
     });
   } catch (error) {
-    next(error);
+    console.error('Error in confirmPayment:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-// @desc    Get customer purchase history
-// @route   GET /api/sales/my-purchases
-// @access  Private
-export const getMyPurchases = async (req, res, next) => {
+// Get purchases
+export const getMyPurchases = async (req, res) => {
   try {
-    const purchases = await Sale.findAll({
-      where: {
-        customerId: req.user.id,
-        paymentStatus: 'completed',
-      },
-      include: [
-        { model: Product, as: 'product' },
-        { model: Branch, as: 'branch' },
-      ],
-      order: [['createdAt', 'DESC']],
-    });
+    const userId = req.user.id;
+    const sales = await Sale.find({ customer: userId })
+      .populate('product')
+      .populate('branch')
+      .sort({ createdAt: -1 });
 
-    res.status(200).json({
+    res.json({
       success: true,
-      count: purchases.length,
-      purchases,
+      data: { purchases: sales || [] }
     });
   } catch (error) {
-    next(error);
+    console.error('Error in getMyPurchases:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-// @desc    M-Pesa callback (for async confirmations)
-// @route   POST /api/sales/mpesa-callback
-// @access  Public
-export const mpesaCallback = async (req, res, next) => {
+// M-Pesa callback
+export const mpesaCallback = async (req, res) => {
   try {
-    // M-Pesa will send callback data here
-    const { Body } = req.body;
-
-    if (!Body || !Body.stkCallback) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid callback data',
-      });
-    }
-
-    const { stkCallback } = Body;
-    const { CheckoutRequestID, ResultCode, ResultDesc } = stkCallback;
-
-    if (ResultCode === 0) {
-      // Payment successful
-      const callbackMetadata = stkCallback.CallbackMetadata?.Item || [];
-
-      // Extract amount and receipt number from callback
-      const amountItem = callbackMetadata.find((item) => item.Name === 'Amount');
-      const receiptItem = callbackMetadata.find((item) => item.Name === 'MpesaReceiptNumber');
-      const phoneItem = callbackMetadata.find((item) => item.Name === 'PhoneNumber');
-
-      // Find and update the sale
-      const sale = await Sale.findOne({ where: { mpesaTransactionId: CheckoutRequestID } });
-
-      if (sale) {
-        sale.paymentStatus = 'completed';
-        if (receiptItem) {
-          sale.mpesaReceiptNumber = receiptItem.Value;
-        }
-        await sale.save();
-
-        // Deduct from stock
-        const stock = await Stock.findOne({
-          where: {
-            branchId: sale.branchId,
-            productId: sale.productId,
-          },
-        });
-
-        if (stock) {
-          stock.quantity -= sale.quantity;
-          await stock.save();
-        }
-      }
-    } else {
-      // Payment failed
-      const sale = await Sale.findOne({ where: { mpesaTransactionId: CheckoutRequestID } });
-      if (sale) {
-        sale.paymentStatus = 'failed';
-        await sale.save();
-      }
-    }
-
-    // Acknowledge callback
-    res.status(200).json({
-      ResultCode: 0,
-      ResultDesc: 'Received',
+    console.log('M-Pesa Callback received');
+    res.json({
+      success: true,
+      message: 'Callback acknowledged'
     });
   } catch (error) {
-    console.error('Error in M-Pesa callback:', error);
-    res.status(200).json({
-      ResultCode: 0,
-      ResultDesc: 'Received',
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };

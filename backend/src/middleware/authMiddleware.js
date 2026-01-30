@@ -7,16 +7,21 @@ export const protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   }
 
+  console.log('Auth middleware - Token exists:', !!token, 'Path:', req.path);
+
   if (!token) {
+    console.log('Auth middleware - No token provided');
     return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
   }
 
   try {
     const secret = process.env.JWT_SECRET || 'your-secret-key';
     const decoded = jwt.verify(token, secret);
+    console.log('Auth middleware - Token verified, user:', decoded.id);
     req.user = decoded;
     next();
   } catch (error) {
+    console.log('Auth middleware - Token verification failed:', error.message);
     return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
   }
 };

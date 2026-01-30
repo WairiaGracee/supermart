@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { adminService } from '../../services/adminService';
+import { branchService } from '../../services/branchService';
 import type { Branch } from '../../types';
 import { ErrorMessage } from '../common/ErrorMessage';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -28,7 +28,7 @@ export function RegisterForm() {
   useEffect(() => {
     const loadBranches = async () => {
       try {
-        const data = await adminService.getBranches();
+        const data = await branchService.getBranches();
         setBranches(data);
       } catch (err) {
         console.error('Failed to load branches:', err);

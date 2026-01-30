@@ -12,6 +12,7 @@ import authRoutes from './src/routes/authRoutes.js';
 import saleRoutes from './src/routes/saleRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import reportRoutes from './src/routes/reportRoutes.js';
+import branchRoutes from './src/routes/branchRoutes.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.get('/health', (req, res) => {
@@ -43,6 +45,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/branches', branchRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

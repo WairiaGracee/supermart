@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../hooks/useCart';
 import { saleService } from '../services/saleService';
-import { adminService } from '../services/adminService';
+import { branchService } from '../services/branchService';
 import type { Product, Branch } from '../types';
 import { BranchSelector } from '../components/customer/BranchSelector';
 import { ProductList } from '../components/customer/ProductList';
@@ -23,7 +23,7 @@ export function CustomerDashboard() {
   useEffect(() => {
     const loadBranches = async () => {
       try {
-        const data = await adminService.getBranches();
+        const data = await branchService.getBranches();
         setBranches(data);
         if (user?.branch) {
           setSelectedBranch(user.branch);

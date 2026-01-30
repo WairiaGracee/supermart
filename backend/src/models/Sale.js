@@ -1,91 +1,54 @@
-import { DataTypes } from 'sequelize';
-import { sequelize } from '../config/db.js';
+// backend/src/models/Sale.js
+// CORRECT MODEL - Matches the actual database schema
 
-const Sale = sequelize.define('Sale', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
+import mongoose from 'mongoose';
+
+const saleSchema = new mongoose.Schema({
+  customer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  customerId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'users',
-      key: 'id',
-    },
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true
   },
-  branchId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'branches',
-      key: 'id',
-    },
-  },
-  productId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'products',
-      key: 'id',
-    },
+  branch: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    required: true
   },
   quantity: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    validate: {
-      min: 1,
-    },
+    type: Number,
+    required: true,
+    min: 1
   },
   unitPrice: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    validate: {
-      min: 0,
-    },
+    type: Number,
+    required: true
   },
   totalAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    validate: {
-      min: 0,
-    },
+    type: Number,
+    required: true
   },
   paymentStatus: {
-    type: DataTypes.STRING,
-    defaultValue: 'pending',
-    validate: {
-      isIn: [['pending', 'completed', 'failed']],
-    },
+    type: String,
+    enum: ['pending', 'completed', 'failed'],
+    default: 'pending'
   },
-  mpesaTransactionId: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  mpesaReceiptNumber: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  paymentMethod: {
-    type: DataTypes.STRING,
-    defaultValue: 'mpesa',
-    validate: {
-      isIn: [['mpesa', 'cash']],
-    },
-  },
+  phoneNumber: String,
+  mpesaReceiptNumber: String,
+  paymentDate: Date,
   saleDate: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
+    type: Date,
+    default: Date.now
   },
-}, {
-  timestamps: true,
-  tableName: 'sales',
-  indexes: [
-    { fields: ['customerId', 'createdAt'] },
-    { fields: ['branchId', 'createdAt'] },
-    { fields: ['productId', 'createdAt'] },
-  ],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
+const Sale = mongoose.model('Sale', saleSchema);
 export default Sale;

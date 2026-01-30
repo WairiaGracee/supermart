@@ -1,16 +1,16 @@
 // backend/src/controllers/saleController.js
-// SIMPLIFIED VERSION - Debug what's happening
 
 import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
-import Branch from '../models/Branch.js';
+import Stock from '../models/Stock.js';
+import { initiateStkPush } from '../services/mpesaService.js';
 
 // Get available products for a branch
 export const getAvailableProducts = async (req, res) => {
   try {
     const { branchId } = req.params;
     const products = await Product.find();
-    
+
     res.json({
       success: true,
       data: { products: products || [] }
@@ -21,18 +21,15 @@ export const getAvailableProducts = async (req, res) => {
   }
 };
 
-// Initiate M-Pesa payment - SIMPLIFIED
+// Initiate M-Pesa payment
 export const initiatePayment = async (req, res) => {
   try {
     console.log('\n🔵 INITIATING PAYMENT');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('User from request:', req.user ? `${req.user.name} (${req.user.id})` : 'NO USER');
 
     const { branchId, productId, quantity, phoneNumber } = req.body;
 
     // Check authentication
     if (!req.user || !req.user.id) {
-      console.log('❌ FAIL: No user authenticated');
       return res.status(401).json({
         success: false,
         message: 'Not authenticated - please login first'
@@ -43,85 +40,103 @@ export const initiatePayment = async (req, res) => {
 
     // Validate inputs
     if (!branchId || !productId || !quantity || !phoneNumber) {
-      console.log('❌ FAIL: Missing fields');
       return res.status(400).json({
         success: false,
         message: 'Missing: branchId, productId, quantity, or phoneNumber'
       });
     }
 
-    console.log('✅ Inputs valid');
-
     // Get product
-    console.log('Looking for product:', productId);
     const product = await Product.findById(productId);
-
     if (!product) {
-      console.log('❌ FAIL: Product not found');
       return res.status(404).json({
         success: false,
-        message: `Product ${productId} not found`
+        message: 'Product not found'
       });
     }
 
-    console.log('✅ Product found:', product.name, 'Price:', product.price);
+    // Check stock availability
+    const stock = await Stock.findOne({ branch: branchId, product: productId });
+    if (!stock || stock.quantity < quantity) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient stock. Available: ${stock?.quantity || 0}`
+      });
+    }
 
-    // Calculate
+    // Calculate total
     const unitPrice = product.price;
     const totalAmount = unitPrice * quantity;
 
-    console.log('Creating sale with:');
-    console.log('  - customer:', userId);
-    console.log('  - product:', productId);
-    console.log('  - branch:', branchId);
-    console.log('  - quantity:', quantity);
-    console.log('  - unitPrice:', unitPrice);
-    console.log('  - totalAmount:', totalAmount);
-    console.log('  - phoneNumber:', phoneNumber);
+    // Format phone number (ensure it starts with 254)
+    let formattedPhone = phoneNumber.toString().replace(/\s+/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '254' + formattedPhone.substring(1);
+    } else if (formattedPhone.startsWith('+')) {
+      formattedPhone = formattedPhone.substring(1);
+    }
 
-    // Create and save
-    const saleData = {
+    console.log('📱 Phone:', formattedPhone);
+    console.log('💰 Amount:', totalAmount);
+
+    // Create sale record first
+    const sale = new Sale({
       customer: userId,
       product: productId,
       branch: branchId,
       quantity: quantity,
       unitPrice: unitPrice,
       totalAmount: totalAmount,
-      phoneNumber: phoneNumber,
+      phoneNumber: formattedPhone,
       paymentStatus: 'pending'
-    };
-
-    console.log('Creating Sale object...');
-    const sale = new Sale(saleData);
-
-    console.log('Saving to database...');
+    });
     const savedSale = await sale.save();
 
-    console.log('✅ SUCCESS: Sale created:', savedSale.id);
+    // Try to initiate M-Pesa STK Push
+    try {
+      console.log('📲 Sending STK Push...');
+      const stkResponse = await initiateStkPush(
+        formattedPhone,
+        totalAmount,
+        `SUPERMART-${savedSale._id.toString().slice(-6).toUpperCase()}`,
+        `Payment for ${quantity}x ${product.name}`
+      );
 
-    res.json({
-      success: true,
-      data: {
-        saleId: savedSale.id,
-        checkoutRequestID: `sandbox-${savedSale.id}`,
-        totalAmount: totalAmount
-      }
-    });
+      console.log('✅ STK Push Response:', stkResponse);
 
-  } catch (error) {
-    console.error('\n❌ ERROR IN PAYMENT:');
-    console.error('Message:', error.message);
-    console.error('Type:', error.name);
-    
-    if (error.errors) {
-      console.error('Validation errors:');
-      Object.keys(error.errors).forEach(field => {
-        console.error(`  - ${field}:`, error.errors[field].message);
+      // Update sale with checkout request ID
+      savedSale.checkoutRequestID = stkResponse.CheckoutRequestID;
+      await savedSale.save();
+
+      res.json({
+        success: true,
+        message: 'M-Pesa prompt sent to your phone. Enter your PIN to complete payment.',
+        data: {
+          saleId: savedSale._id,
+          checkoutRequestID: stkResponse.CheckoutRequestID,
+          totalAmount: totalAmount
+        }
+      });
+
+    } catch (mpesaError) {
+      console.error('❌ M-Pesa Error:', mpesaError.message);
+
+      // If M-Pesa fails, still return the sale ID so user can retry
+      // Mark as pending for manual confirmation
+      res.json({
+        success: true,
+        message: 'Payment created. If you did not receive a prompt, please try again or pay manually.',
+        data: {
+          saleId: savedSale._id,
+          checkoutRequestID: `pending-${savedSale._id}`,
+          totalAmount: totalAmount,
+          mpesaError: mpesaError.message
+        }
       });
     }
-    
-    console.error('Stack:', error.stack);
 
+  } catch (error) {
+    console.error('❌ ERROR IN PAYMENT:', error.message);
     res.status(500).json({
       success: false,
       message: error.message
@@ -129,10 +144,10 @@ export const initiatePayment = async (req, res) => {
   }
 };
 
-// Confirm payment
+// Confirm payment (manual or callback)
 export const confirmPayment = async (req, res) => {
   try {
-    const { saleId } = req.body;
+    const { saleId, mpesaReceiptNumber } = req.body;
 
     if (!saleId) {
       return res.status(400).json({
@@ -149,12 +164,24 @@ export const confirmPayment = async (req, res) => {
       });
     }
 
+    // Update stock (reduce quantity)
+    const stock = await Stock.findOne({ branch: sale.branch, product: sale.product });
+    if (stock) {
+      stock.quantity -= sale.quantity;
+      await stock.save();
+    }
+
+    // Update sale status
     sale.paymentStatus = 'completed';
     sale.paymentDate = new Date();
+    if (mpesaReceiptNumber) {
+      sale.mpesaReceiptNumber = mpesaReceiptNumber;
+    }
     await sale.save();
 
     res.json({
       success: true,
+      message: 'Payment confirmed successfully!',
       data: { sale }
     });
   } catch (error) {
@@ -166,7 +193,7 @@ export const confirmPayment = async (req, res) => {
   }
 };
 
-// Get purchases
+// Get user's purchases
 export const getMyPurchases = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -188,18 +215,58 @@ export const getMyPurchases = async (req, res) => {
   }
 };
 
-// M-Pesa callback
+// M-Pesa callback handler
 export const mpesaCallback = async (req, res) => {
   try {
-    console.log('M-Pesa Callback received');
-    res.json({
-      success: true,
-      message: 'Callback acknowledged'
-    });
+    console.log('\n📥 M-PESA CALLBACK RECEIVED');
+    console.log(JSON.stringify(req.body, null, 2));
+
+    const { Body } = req.body;
+
+    if (!Body || !Body.stkCallback) {
+      return res.json({ success: true, message: 'Callback acknowledged' });
+    }
+
+    const { ResultCode, ResultDesc, CallbackMetadata, CheckoutRequestID } = Body.stkCallback;
+
+    // Find the sale by checkout request ID
+    const sale = await Sale.findOne({ checkoutRequestID: CheckoutRequestID });
+
+    if (!sale) {
+      console.log('Sale not found for CheckoutRequestID:', CheckoutRequestID);
+      return res.json({ success: true, message: 'Sale not found' });
+    }
+
+    if (ResultCode === 0) {
+      // Payment successful
+      const metadata = CallbackMetadata?.Item || [];
+      const receiptNumber = metadata.find(item => item.Name === 'MpesaReceiptNumber')?.Value;
+
+      // Update stock
+      const stock = await Stock.findOne({ branch: sale.branch, product: sale.product });
+      if (stock) {
+        stock.quantity -= sale.quantity;
+        await stock.save();
+      }
+
+      // Update sale
+      sale.paymentStatus = 'completed';
+      sale.mpesaReceiptNumber = receiptNumber;
+      sale.paymentDate = new Date();
+      await sale.save();
+
+      console.log('✅ Payment completed:', receiptNumber);
+    } else {
+      // Payment failed
+      sale.paymentStatus = 'failed';
+      await sale.save();
+      console.log('❌ Payment failed:', ResultDesc);
+    }
+
+    res.json({ success: true, message: 'Callback processed' });
+
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    console.error('Callback error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

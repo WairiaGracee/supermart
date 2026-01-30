@@ -32,56 +32,56 @@ const products = [
   {
     name: 'Coca-Cola',
     description: 'Ice-cold Coca-Cola 500ml bottle',
-    price: 150,
+    price: 1,
     category: 'Soft Drinks',
     image: 'https://images.unsplash.com/photo-1554866585-e1d8d3f61c5e?w=500&h=500&fit=crop'
   },
   {
     name: 'Fanta Orange',
     description: 'Refreshing Fanta Orange 500ml',
-    price: 150,
+    price: 1,
     category: 'Soft Drinks',
     image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=500&h=500&fit=crop'
   },
   {
     name: 'Sprite',
     description: 'Crisp Sprite Lemon-Lime 500ml',
-    price: 150,
+    price: 1,
     category: 'Soft Drinks',
     image: 'https://images.unsplash.com/photo-1554866585-e1d8d3f61c5e?w=500&h=500&fit=crop'
   },
   {
     name: 'Fanta Grape',
     description: 'Delicious Fanta Grape 500ml',
-    price: 150,
+    price: 1,
     category: 'Soft Drinks',
     image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=500&h=500&fit=crop'
   },
   {
     name: 'Pepsi',
     description: 'Classic Pepsi 500ml bottle',
-    price: 150,
+    price: 1,
     category: 'Soft Drinks',
     image: 'https://images.unsplash.com/photo-1554866585-e1d8d3f61c5e?w=500&h=500&fit=crop'
   },
   {
     name: 'Mountain Dew',
     description: 'Energizing Mountain Dew 500ml',
-    price: 180,
+    price: 1,
     category: 'Soft Drinks',
     image: 'https://images.unsplash.com/photo-1600788148184-7fdde50b5837?w=500&h=500&fit=crop'
   },
   {
     name: 'Minute Maid Orange',
     description: 'Minute Maid Orange Juice 500ml',
-    price: 200,
+    price: 1,
     category: 'Juices',
     image: 'https://images.unsplash.com/photo-1600788148184-7fdde50b5837?w=500&h=500&fit=crop'
   },
   {
     name: 'Tropika Mango',
     description: 'Tropical Tropika Mango 500ml',
-    price: 180,
+    price: 1,
     category: 'Juices',
     image: 'https://images.unsplash.com/photo-1600788148184-7fdde50b5837?w=500&h=500&fit=crop'
   }

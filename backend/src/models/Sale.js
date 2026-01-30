@@ -38,6 +38,7 @@ const saleSchema = new mongoose.Schema({
     default: 'pending'
   },
   phoneNumber: String,
+  checkoutRequestID: String,
   mpesaReceiptNumber: String,
   paymentDate: Date,
   saleDate: {

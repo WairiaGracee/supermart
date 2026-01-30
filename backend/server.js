@@ -46,6 +46,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/branches', branchRoutes);
 
+// Additional M-Pesa callback route (for compatibility with other setups)
+import { mpesaCallback } from './src/controllers/saleController.js';
+app.post('/api/mpesa/callback', mpesaCallback);
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
